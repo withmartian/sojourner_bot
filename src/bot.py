@@ -3,6 +3,8 @@ from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 import requests
 import dotenv
+from sojourner import Sojourner
+import json
 
 dotenv.load_dotenv()
 
@@ -10,6 +12,7 @@ SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")
 
 app = App(token=SLACK_BOT_TOKEN)
+sojourner_client = Sojourner()
 
 
 @app.event("file_shared")
@@ -25,9 +28,29 @@ def handle_file_shared_events(body, say):
     )
     if response.status_code == 200:
         filename = file_info["file"]["name"]
-        with open(filename, "wb") as f:
-            f.write(response.content)
-        say(f"File '{filename}' has been downloaded and saved.")
+        file_content = response.content
+
+        # Look up the channel name properly
+        channel_id = body["event"]["channel_id"]
+        channel_info = app.client.conversations_info(channel=channel_id)
+        channel_name = channel_info["channel"]["name"]
+        client = channel_name.split("-")[-1]
+
+        success = sojourner_client.store(
+            client,
+            filename,
+            file_content,
+            manifest=f"File uploaded from Slack: {filename}",
+        )
+
+        if success:
+            say(
+                f"File '{filename}' has been downloaded and uploaded to the Sojourner bucket."
+            )
+        else:
+            say(
+                f"File '{filename}' was downloaded but couldn't be uploaded to the Sojourner bucket."
+            )
     else:
         say("Sorry, I couldn't download the file.")
 
