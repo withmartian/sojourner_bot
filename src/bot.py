@@ -25,12 +25,6 @@ def get_client_options(input_value=""):
     return options
 
 
-@app.event("file_created")
-def handle_file_created_events(body, say):
-    # Empty handler for file_created event
-    pass
-
-
 @app.event("message")
 def handle_message(event, say):
     # This will handle all messages, including those in DMs
@@ -44,13 +38,13 @@ def handle_file_shared(file, say, channel):
     filename = file["name"]
 
     result = say(
-        text=f"Do you want to upload '{filename}' to Sojourner?",
+        text=f"Do you want to upload `{filename}` to Sojourner?",
         blocks=[
             {
                 "type": "section",
                 "text": {
                     "type": "mrkdwn",
-                    "text": f"Do you want to upload '*{filename}*' to Sojourner?",
+                    "text": f"Do you want to upload `{filename}` to Sojourner?",
                 },
             },
             {
