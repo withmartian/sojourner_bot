@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 import uvicorn
 import requests
 import dotenv
-from sojourner import Sojourner
+from sojourner import Sojourner, Result
 import logging
 import sys
 
@@ -186,19 +186,34 @@ def handle_client_name_submission(ack, body, client, view):
     if response.status_code == 200:
         filename = file_info["file"]["name"]
         file_content = response.content
-        success = sojourner_client.store(
+        result: Result = sojourner_client.store(
             client_name, filename, file_content, manifest=manifest
         )
 
-        if success:
+        if result == Result.SUCCESS:
             client.chat_postMessage(
                 channel=channel_id,
-                text=f"File `{filename}` has been uploaded to Sojourner for client `{client_name}`.\nManifest: `{manifest}`",
+                text=f"File `{filename}` has been successfully uploaded to Sojourner for client `{client_name}`.\nManifest: `{manifest}`",
+            )
+        elif result == Result.BLOB_EXISTS:
+            client.chat_postMessage(
+                channel=channel_id,
+                text=f"Failed to upload `{filename}` to Sojourner for `{client_name}`. A file with this name already exists.",
+            )
+        elif result == Result.UPLOAD_ERROR:
+            client.chat_postMessage(
+                channel=channel_id,
+                text=f"Failed to upload `{filename}` to Sojourner for `{client_name}` due to an upload error. Please try again later.",
+            )
+        elif result == Result.METADATA_ERROR:
+            client.chat_postMessage(
+                channel=channel_id,
+                text=f"Failed to upload `{filename}` to Sojourner for `{client_name}` due to a metadata error. Please check your manifest and try again.",
             )
         else:
             client.chat_postMessage(
                 channel=channel_id,
-                text=f"Failed to upload `{filename}` to Sojourner for `{client_name}`—likely due to collision.",
+                text=f"An unexpected error occurred while uploading `{filename}` to Sojourner for `{client_name}`.",
             )
         client.chat_delete(channel=channel_id, ts=message_ts)
     else:
