@@ -1,28 +1,26 @@
 import os
 import json
 from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.adapter.fastapi import SlackRequestHandler
+from fastapi import FastAPI, Request
+import uvicorn
 import requests
 import dotenv
 from sojourner import Sojourner
+import logging
+import sys
 
 dotenv.load_dotenv()
 
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
-SLACK_APP_TOKEN = os.getenv("SLACK_APP_TOKEN")
+SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
 
-app = App(token=SLACK_BOT_TOKEN)
+app = App(token=SLACK_BOT_TOKEN, signing_secret=SLACK_SIGNING_SECRET)
+fastapi_app = FastAPI()
+handler = SlackRequestHandler(app)
 sojourner_client = Sojourner()
 
-
-def get_client_options(input_value=""):
-    all_clients = sojourner_client.list_all_directories()
-    options = [
-        {"text": {"type": "plain_text", "text": name}, "value": name}
-        for name in all_clients
-        if input_value.lower() in name.lower()
-    ]
-    return options
+logging.basicConfig(level=logging.INFO)
 
 
 @app.event("message")
@@ -109,13 +107,16 @@ def handle_yes(ack, body, client):
                     "type": "input",
                     "block_id": "client_name_block",
                     "element": {
-                        "type": "external_select",
+                        "type": "static_select",
                         "placeholder": {
                             "type": "plain_text",
-                            "text": "Select or enter client name",
+                            "text": "Select client name",
                         },
                         "action_id": "client_name_select",
-                        "min_query_length": 0,
+                        "options": [
+                            {"text": {"type": "plain_text", "text": client}, "value": client}
+                            for client in sojourner_client.list_all_directories()
+                        ],
                     },
                     "label": {"type": "plain_text", "text": "Client Name"},
                 },
@@ -206,6 +207,15 @@ def handle_client_name_submission(ack, body, client, view):
         )
 
 
+@fastapi_app.post("/slack/events")
+async def slack_events(req: Request):
+    return await handler.handle(req)
+
+
+@fastapi_app.get("/")
+async def root():
+    return {"message": "Slack bot is running"}
+
+
 if __name__ == "__main__":
-    handler = SocketModeHandler(app, SLACK_APP_TOKEN)
-    handler.start()
+    uvicorn.run(fastapi_app, host="0.0.0.0", port=3000)
