@@ -1,3 +1,9 @@
+import logging
+import sys
+import dotenv
+
+dotenv.load_dotenv()
+
 import os
 import json
 from slack_bolt import App
@@ -5,12 +11,7 @@ from slack_bolt.adapter.fastapi import SlackRequestHandler
 from fastapi import FastAPI, Request
 import uvicorn
 import requests
-import dotenv
 from sojourner import Sojourner, Result
-import logging
-import sys
-
-dotenv.load_dotenv()
 
 SLACK_BOT_TOKEN = os.getenv("SLACK_BOT_TOKEN")
 SLACK_SIGNING_SECRET = os.getenv("SLACK_SIGNING_SECRET")
@@ -114,7 +115,10 @@ def handle_yes(ack, body, client):
                         },
                         "action_id": "client_name_select",
                         "options": [
-                            {"text": {"type": "plain_text", "text": client}, "value": client}
+                            {
+                                "text": {"type": "plain_text", "text": client},
+                                "value": client,
+                            }
                             for client in sojourner_client.list_all_directories()
                         ],
                     },
